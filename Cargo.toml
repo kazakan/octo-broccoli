@@ -2,7 +2,7 @@
 name = "ocbro"
 version = "0.1.0"
 edition = "2021"
-description = "Simple template filling cli"
+description = "Simple template filling CLI"
 
 [[bin]]
 name = "ocbro"
