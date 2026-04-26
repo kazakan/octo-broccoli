@@ -1,11 +1,11 @@
 [package]
-name = "mycli"
+name = "ocbro"
 version = "0.1.0"
 edition = "2021"
 description = "Fast, low-resource, read-only CLI tool: SQLite → Filter → Projection → Template"
 
 [[bin]]
-name = "mycli"
+name = "ocbro"
 path = "src/main.rs"
 
 [dependencies]

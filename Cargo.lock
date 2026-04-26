@@ -386,19 +386,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 
 [[package]]
-name = "mycli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "handlebars",
- "rusqlite",
- "serde",
- "serde_json",
- "serde_yaml",
-]
-
-[[package]]
 name = "num-modular"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -411,6 +398,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "537b596b97c40fcf8056d153049eb22f481c17ebce72a513ec9286e4986d1bb6"
 dependencies = [
  "num-modular",
+]
+
+[[package]]
+name = "ocbro"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "handlebars",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "serde_yaml",
 ]
 
 [[package]]

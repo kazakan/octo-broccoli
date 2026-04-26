@@ -12,7 +12,7 @@ use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "mycli",
+    name = "ocbro",
     version,
     about = "Fast, read-only SQLite → Filter → Projection → Template CLI"
 )]

@@ -1,4 +1,4 @@
-# mycli – SQLite → Template CLI
+# ocbro – SQLite → Template CLI
 
 A fast, low-resource, **read-only** CLI tool that:
 
@@ -13,7 +13,7 @@ A fast, low-resource, **read-only** CLI tool that:
 
 ```bash
 cargo build --release
-# binary: ./target/release/mycli
+# binary: ./target/release/ocbro
 ```
 
 ---
@@ -21,7 +21,7 @@ cargo build --release
 ## Usage
 
 ```
-mycli run <CONFIG> [OPTIONS]
+ocbro run <CONFIG> [OPTIONS]
 
 Arguments:
   <CONFIG>               Path to the YAML config file
@@ -36,16 +36,16 @@ Options:
 
 ```bash
 # Basic run
-mycli run config.yaml
+ocbro run config.yaml
 
 # Override the database path
-mycli run config.yaml --db ./override.db
+ocbro run config.yaml --db ./override.db
 
 # Single template override
-mycli run config.yaml --template report.tpl
+ocbro run config.yaml --template report.tpl
 
 # Multiple template overrides
-mycli run config.yaml \
+ocbro run config.yaml \
   --template summary.tpl \
   --template detail.tpl
 ```
