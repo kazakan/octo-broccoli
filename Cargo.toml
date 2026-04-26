@@ -2,7 +2,7 @@
 name = "ocbro"
 version = "0.1.0"
 edition = "2021"
-description = "Fast, low-resource, read-only CLI tool: SQLite → Filter → Projection → Template"
+description = "Simple template filling cli"
 
 [[bin]]
 name = "ocbro"

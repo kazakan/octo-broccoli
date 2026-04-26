@@ -180,3 +180,59 @@ fn format_filter_display(f: &FilterCondition) -> String {
         None => f.op.as_str().to_string(),
     }
 }
+
+// ── Tests ────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use config::{FilterCondition, FilterOp};
+    use serde_json::json;
+
+    fn make_cond(field: &str, op: FilterOp, value: Option<serde_json::Value>) -> FilterCondition {
+        FilterCondition { field: field.to_string(), op, value }
+    }
+
+    #[test]
+    fn test_merge_filters_no_cli_filters() {
+        let config_filters = vec![make_cond("age", FilterOp::Gte, Some(json!(18)))];
+        let result = merge_filters(config_filters.clone(), &[]).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].field, "age");
+    }
+
+    #[test]
+    fn test_merge_filters_new_cli_filter_appended() {
+        let config_filters = vec![make_cond("age", FilterOp::Gte, Some(json!(18)))];
+        let result = merge_filters(config_filters, &["active:eq:1".to_string()]).unwrap();
+        assert_eq!(result.len(), 2);
+        assert!(result.iter().any(|f| f.field == "age"));
+        assert!(result.iter().any(|f| f.field == "active"));
+    }
+
+    #[test]
+    fn test_merge_filters_cli_overrides_same_field() {
+        let config_filters = vec![make_cond("age", FilterOp::Gte, Some(json!(18)))];
+        // CLI supplies a different op+value for the same field.
+        let result = merge_filters(config_filters, &["age:lt:30".to_string()]).unwrap();
+        // Only one filter for 'age' should remain (the CLI one).
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].field, "age");
+        assert_eq!(result[0].op, FilterOp::Lt);
+        assert_eq!(result[0].value, Some(json!(30)));
+    }
+
+    #[test]
+    fn test_merge_filters_multiple_cli_filters() {
+        let config_filters = vec![];
+        let cli = vec!["age:gte:18".to_string(), "deleted_at:is_null".to_string()];
+        let result = merge_filters(config_filters, &cli).unwrap();
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_merge_filters_invalid_cli_filter_returns_error() {
+        let result = merge_filters(vec![], &["badformat".to_string()]);
+        assert!(result.is_err());
+    }
+}

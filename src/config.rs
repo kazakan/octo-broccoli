@@ -280,3 +280,119 @@ impl Config {
         );
     }
 }
+
+// ── Tests ────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    // ── FilterOp::parse ───────────────────────────────────────────────────────
+
+    #[test]
+    fn test_filter_op_parse_all_valid() {
+        let cases = [
+            ("eq", FilterOp::Eq),
+            ("ne", FilterOp::Ne),
+            ("gt", FilterOp::Gt),
+            ("lt", FilterOp::Lt),
+            ("gte", FilterOp::Gte),
+            ("lte", FilterOp::Lte),
+            ("contains", FilterOp::Contains),
+            ("starts_with", FilterOp::StartsWith),
+            ("ends_with", FilterOp::EndsWith),
+            ("is_null", FilterOp::IsNull),
+            ("is_not_null", FilterOp::IsNotNull),
+        ];
+        for (s, expected) in cases {
+            assert_eq!(FilterOp::parse(s).unwrap(), expected, "failed for '{s}'");
+        }
+    }
+
+    #[test]
+    fn test_filter_op_parse_invalid() {
+        assert!(FilterOp::parse("like").is_err());
+        assert!(FilterOp::parse("EQ").is_err());
+        assert!(FilterOp::parse("").is_err());
+    }
+
+    #[test]
+    fn test_filter_op_roundtrip() {
+        let ops = [
+            FilterOp::Eq, FilterOp::Ne, FilterOp::Gt, FilterOp::Lt,
+            FilterOp::Gte, FilterOp::Lte, FilterOp::Contains,
+            FilterOp::StartsWith, FilterOp::EndsWith,
+            FilterOp::IsNull, FilterOp::IsNotNull,
+        ];
+        for op in ops {
+            let s = op.as_str();
+            assert_eq!(FilterOp::parse(s).unwrap(), op);
+        }
+    }
+
+    // ── FilterCondition::from_cli_str ─────────────────────────────────────────
+
+    #[test]
+    fn test_from_cli_str_eq_integer() {
+        let f = FilterCondition::from_cli_str("age:eq:18").unwrap();
+        assert_eq!(f.field, "age");
+        assert_eq!(f.op, FilterOp::Eq);
+        assert_eq!(f.value, Some(json!(18)));
+    }
+
+    #[test]
+    fn test_from_cli_str_eq_string() {
+        let f = FilterCondition::from_cli_str("name:eq:Alice").unwrap();
+        assert_eq!(f.field, "name");
+        assert_eq!(f.op, FilterOp::Eq);
+        assert_eq!(f.value, Some(json!("Alice")));
+    }
+
+    #[test]
+    fn test_from_cli_str_float_value() {
+        let f = FilterCondition::from_cli_str("score:gte:1.5").unwrap();
+        assert_eq!(f.field, "score");
+        assert_eq!(f.op, FilterOp::Gte);
+        // Value should be a JSON number ~1.5
+        let n = f.value.unwrap();
+        assert!((n.as_f64().unwrap() - 1.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_from_cli_str_is_null_no_value() {
+        let f = FilterCondition::from_cli_str("deleted_at:is_null").unwrap();
+        assert_eq!(f.field, "deleted_at");
+        assert_eq!(f.op, FilterOp::IsNull);
+        assert!(f.value.is_none());
+    }
+
+    #[test]
+    fn test_from_cli_str_is_not_null_no_value() {
+        let f = FilterCondition::from_cli_str("col:is_not_null").unwrap();
+        assert_eq!(f.op, FilterOp::IsNotNull);
+        assert!(f.value.is_none());
+    }
+
+    #[test]
+    fn test_from_cli_str_value_with_colon_preserved() {
+        // Timestamps contain ':'; the third part must not be split further.
+        let f = FilterCondition::from_cli_str("ts:eq:2024-01-01T00:00:00").unwrap();
+        assert_eq!(f.value, Some(json!("2024-01-01T00:00:00")));
+    }
+
+    #[test]
+    fn test_from_cli_str_invalid_op() {
+        assert!(FilterCondition::from_cli_str("age:LIKE:5").is_err());
+    }
+
+    #[test]
+    fn test_from_cli_str_missing_value_for_eq() {
+        assert!(FilterCondition::from_cli_str("age:eq").is_err());
+    }
+
+    #[test]
+    fn test_from_cli_str_too_few_parts() {
+        assert!(FilterCondition::from_cli_str("age").is_err());
+    }
+}

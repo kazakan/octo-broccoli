@@ -1,6 +1,6 @@
-# ocbro – SQLite → Template CLI
+# ocbro – Simple template filling CLI
 
-A fast, low-resource, **read-only** CLI tool that:
+A simple, **read-only** CLI tool that:
 
 1. Reads rows from a **SQLite** database
 2. Applies **in-memory filters** (AND conditions)

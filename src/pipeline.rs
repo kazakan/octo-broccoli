@@ -86,3 +86,186 @@ pub fn apply_projection(row: Map<String, Value>, fields: &[String]) -> Map<Strin
         })
         .collect()
 }
+
+// ── Tests ────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::{FilterCondition, FilterOp};
+    use serde_json::json;
+
+    fn row(pairs: &[(&str, serde_json::Value)]) -> Map<String, Value> {
+        pairs.iter().map(|(k, v)| (k.to_string(), v.clone())).collect()
+    }
+
+    fn cond(field: &str, op: FilterOp, value: Option<Value>) -> FilterCondition {
+        FilterCondition { field: field.to_string(), op, value }
+    }
+
+    // ── filter: eq / ne ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_filter_eq_int_match() {
+        let r = row(&[("age", json!(18))]);
+        assert!(apply_filter(&r, &[cond("age", FilterOp::Eq, Some(json!(18)))]));
+    }
+
+    #[test]
+    fn test_filter_eq_int_no_match() {
+        let r = row(&[("age", json!(17))]);
+        assert!(!apply_filter(&r, &[cond("age", FilterOp::Eq, Some(json!(18)))]));
+    }
+
+    #[test]
+    fn test_filter_eq_string() {
+        let r = row(&[("name", json!("Alice"))]);
+        assert!(apply_filter(&r, &[cond("name", FilterOp::Eq, Some(json!("Alice")))]));
+        assert!(!apply_filter(&r, &[cond("name", FilterOp::Eq, Some(json!("Bob")))]));
+    }
+
+    #[test]
+    fn test_filter_ne() {
+        let r = row(&[("age", json!(20))]);
+        assert!(apply_filter(&r, &[cond("age", FilterOp::Ne, Some(json!(18)))]));
+        assert!(!apply_filter(&r, &[cond("age", FilterOp::Ne, Some(json!(20)))]));
+    }
+
+    // ── filter: numeric comparisons ──────────────────────────────────────────
+
+    #[test]
+    fn test_filter_gt() {
+        let r = row(&[("age", json!(19))]);
+        assert!(apply_filter(&r, &[cond("age", FilterOp::Gt, Some(json!(18)))]));
+        assert!(!apply_filter(&r, &[cond("age", FilterOp::Gt, Some(json!(19)))]));
+        assert!(!apply_filter(&r, &[cond("age", FilterOp::Gt, Some(json!(20)))]));
+    }
+
+    #[test]
+    fn test_filter_lt() {
+        let r = row(&[("age", json!(17))]);
+        assert!(apply_filter(&r, &[cond("age", FilterOp::Lt, Some(json!(18)))]));
+        assert!(!apply_filter(&r, &[cond("age", FilterOp::Lt, Some(json!(17)))]));
+    }
+
+    #[test]
+    fn test_filter_gte() {
+        let r = row(&[("age", json!(18))]);
+        assert!(apply_filter(&r, &[cond("age", FilterOp::Gte, Some(json!(18)))]));
+        assert!(apply_filter(&r, &[cond("age", FilterOp::Gte, Some(json!(17)))]));
+        assert!(!apply_filter(&r, &[cond("age", FilterOp::Gte, Some(json!(19)))]));
+    }
+
+    #[test]
+    fn test_filter_lte() {
+        let r = row(&[("age", json!(18))]);
+        assert!(apply_filter(&r, &[cond("age", FilterOp::Lte, Some(json!(18)))]));
+        assert!(apply_filter(&r, &[cond("age", FilterOp::Lte, Some(json!(19)))]));
+        assert!(!apply_filter(&r, &[cond("age", FilterOp::Lte, Some(json!(17)))]));
+    }
+
+    // ── filter: string ops ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_filter_contains() {
+        let r = row(&[("name", json!("Alice Wonderland"))]);
+        assert!(apply_filter(&r, &[cond("name", FilterOp::Contains, Some(json!("Alice")))]));
+        assert!(!apply_filter(&r, &[cond("name", FilterOp::Contains, Some(json!("Bob")))]));
+    }
+
+    #[test]
+    fn test_filter_starts_with() {
+        let r = row(&[("name", json!("Alice"))]);
+        assert!(apply_filter(&r, &[cond("name", FilterOp::StartsWith, Some(json!("Ali")))]));
+        assert!(!apply_filter(&r, &[cond("name", FilterOp::StartsWith, Some(json!("ice")))]));
+    }
+
+    #[test]
+    fn test_filter_ends_with() {
+        let r = row(&[("name", json!("Alice"))]);
+        assert!(apply_filter(&r, &[cond("name", FilterOp::EndsWith, Some(json!("ice")))]));
+        assert!(!apply_filter(&r, &[cond("name", FilterOp::EndsWith, Some(json!("Ali")))]));
+    }
+
+    // ── filter: null ops ─────────────────────────────────────────────────────
+
+    #[test]
+    fn test_filter_is_null() {
+        let r_null = row(&[("deleted_at", json!(null))]);
+        let r_val = row(&[("deleted_at", json!("2024-01-01"))]);
+        assert!(apply_filter(&r_null, &[cond("deleted_at", FilterOp::IsNull, None)]));
+        assert!(!apply_filter(&r_val, &[cond("deleted_at", FilterOp::IsNull, None)]));
+    }
+
+    #[test]
+    fn test_filter_is_not_null() {
+        let r_null = row(&[("deleted_at", json!(null))]);
+        let r_val = row(&[("deleted_at", json!("2024-01-01"))]);
+        assert!(!apply_filter(&r_null, &[cond("deleted_at", FilterOp::IsNotNull, None)]));
+        assert!(apply_filter(&r_val, &[cond("deleted_at", FilterOp::IsNotNull, None)]));
+    }
+
+    #[test]
+    fn test_filter_missing_field_treated_as_null() {
+        let r = row(&[("name", json!("Alice"))]);
+        // "missing_col" not in row → treated as Null
+        assert!(apply_filter(&r, &[cond("missing_col", FilterOp::IsNull, None)]));
+    }
+
+    // ── filter: AND combination ──────────────────────────────────────────────
+
+    #[test]
+    fn test_filter_and_all_pass() {
+        let r = row(&[("age", json!(25)), ("active", json!(1))]);
+        let conditions = vec![
+            cond("age", FilterOp::Gte, Some(json!(18))),
+            cond("active", FilterOp::Eq, Some(json!(1))),
+        ];
+        assert!(apply_filter(&r, &conditions));
+    }
+
+    #[test]
+    fn test_filter_and_one_fails() {
+        let r = row(&[("age", json!(15)), ("active", json!(1))]);
+        let conditions = vec![
+            cond("age", FilterOp::Gte, Some(json!(18))),
+            cond("active", FilterOp::Eq, Some(json!(1))),
+        ];
+        assert!(!apply_filter(&r, &conditions));
+    }
+
+    #[test]
+    fn test_filter_no_conditions_passes_all() {
+        let r = row(&[("age", json!(5))]);
+        assert!(apply_filter(&r, &[]));
+    }
+
+    // ── projection ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_projection_keeps_specified_fields() {
+        let r = row(&[("id", json!(1)), ("name", json!("Alice")), ("age", json!(30))]);
+        let fields: Vec<String> = vec!["id".into(), "name".into()];
+        let projected = apply_projection(r, &fields);
+        assert_eq!(projected.len(), 2);
+        assert!(projected.contains_key("id"));
+        assert!(projected.contains_key("name"));
+        assert!(!projected.contains_key("age"));
+    }
+
+    #[test]
+    fn test_projection_empty_keeps_all() {
+        let r = row(&[("id", json!(1)), ("name", json!("Alice")), ("age", json!(30))]);
+        let projected = apply_projection(r, &[]);
+        assert_eq!(projected.len(), 3);
+    }
+
+    #[test]
+    fn test_projection_unknown_field_is_ignored() {
+        let r = row(&[("id", json!(1))]);
+        let fields: Vec<String> = vec!["id".into(), "nonexistent".into()];
+        let projected = apply_projection(r, &fields);
+        assert_eq!(projected.len(), 1);
+        assert!(projected.contains_key("id"));
+    }
+}
