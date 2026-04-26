@@ -1,0 +1,33 @@
+source:
+  db_path: ./data.db
+  table: users        # builds: SELECT * FROM "users"
+  # query: "SELECT id, name, age FROM users WHERE active = 1"  # or raw SQL
+
+filter:               # in-memory AND conditions (optional)
+  - field: active
+    op: eq
+    value: 1
+  - field: age
+    op: gte
+    value: 18
+
+projection:           # fields to keep; empty = keep all (optional)
+  - id
+  - name
+  - age
+
+# Template priority:
+#   1. CLI --template (highest)
+#   2. templates list below
+#   3. template_file
+#   4. template (inline, lowest)
+
+templates:
+  - inline: "=== Users ({{count}} total) ==="
+  - file: ./templates/detail.tpl
+
+# Fallback alternatives:
+# template_file: ./templates/report.tpl
+# template: |
+#   {{#each rows}}{{name}} ({{age}})
+#   {{/each}}
