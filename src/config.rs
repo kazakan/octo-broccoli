@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Top-level configuration loaded from a YAML file.
 #[derive(Debug, Deserialize, Serialize)]
@@ -141,20 +141,25 @@ impl Config {
     /// Resolve the effective list of templates given optional CLI overrides.
     ///
     /// Priority (highest first):
-    /// 1. `cli_templates` – paths supplied via `--template` on the CLI
-    /// 2. `config.templates`
-    /// 3. `config.template_file`
+    /// 1. `cli_templates` – paths supplied via `--template` on the CLI (resolved against `cli_dir`)
+    /// 2. `config.templates`            (resolved against `config_dir`)
+    /// 3. `config.template_file`        (resolved against `config_dir`)
     /// 4. `config.template` (inline)
     pub fn resolve_templates(
         &self,
         cli_templates: &[String],
+        cli_dir: &Path,
         config_dir: &Path,
     ) -> Result<Vec<ResolvedTemplate>> {
         if !cli_templates.is_empty() {
             return cli_templates
                 .iter()
                 .map(|p| {
-                    let full = config_dir.join(p);
+                    let full = if Path::new(p).is_absolute() {
+                        PathBuf::from(p)
+                    } else {
+                        cli_dir.join(p)
+                    };
                     let body = fs::read_to_string(&full)
                         .with_context(|| format!("reading template file '{}'", full.display()))?;
                     Ok(ResolvedTemplate::File {

@@ -5,7 +5,7 @@ mod template;
 
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 
 // ── CLI definition ───────────────────────────────────────────────────────────
@@ -74,20 +74,21 @@ fn execute_run(
         .parent()
         .unwrap_or_else(|| Path::new("."));
 
-    // 2. Resolve the effective db path
-    let db_path_override = db_override.map(|p| {
-        // If the override is relative, resolve it against the cwd.
-        if Path::new(p).is_absolute() {
-            p.to_string()
-        } else {
-            std::env::current_dir()
-                .map(|cwd| cwd.join(p).display().to_string())
-                .unwrap_or_else(|_| p.to_string())
-        }
-    });
+    // 2. Resolve the effective db path (relative paths are anchored to cwd).
+    let db_path_override = db_override
+        .map(|p| -> Result<String> {
+            if Path::new(p).is_absolute() {
+                Ok(p.to_string())
+            } else {
+                let cwd = std::env::current_dir().context("determining current directory")?;
+                Ok(cwd.join(p).display().to_string())
+            }
+        })
+        .transpose()?;
 
-    // 3. Resolve templates
-    let resolved_templates = cfg.resolve_templates(cli_templates, config_dir)?;
+    // 3. Resolve templates (CLI templates are anchored to cwd; config templates to config_dir).
+    let cwd = std::env::current_dir().context("determining current directory")?;
+    let resolved_templates = cfg.resolve_templates(cli_templates, &cwd, config_dir)?;
 
     // 4. Query SQLite
     let raw_rows = db::query_rows(&cfg.source, db_path_override.as_deref())?;
