@@ -51,6 +51,51 @@ pub struct FilterCondition {
     pub value: Option<Value>,
 }
 
+impl FilterCondition {
+    /// Parse a CLI `--filter` string of the form `FIELD:OP[:VALUE]`.
+    ///
+    /// `VALUE` is optional for `is_null` / `is_not_null` and required for all
+    /// other operators.  The value is interpreted as a JSON number when possible,
+    /// otherwise as a plain string.
+    pub fn from_cli_str(s: &str) -> Result<Self> {
+        // Split on ':' with a max of 3 parts so that values containing ':'
+        // (e.g. timestamps) are kept intact.
+        let parts: Vec<&str> = s.splitn(3, ':').collect();
+        if parts.len() < 2 {
+            bail!("invalid --filter '{s}': expected FIELD:OP[:VALUE]");
+        }
+        let field = parts[0].to_string();
+        let op = FilterOp::parse(parts[1])
+            .with_context(|| format!("invalid --filter '{s}'"))?;
+
+        let needs_value = !matches!(op, FilterOp::IsNull | FilterOp::IsNotNull);
+        let value = if parts.len() >= 3 {
+            let raw = parts[2];
+            // Prefer integer, then float, then plain string.
+            if let Ok(n) = raw.parse::<i64>() {
+                Some(Value::Number(n.into()))
+            } else if let Ok(f) = raw.parse::<f64>() {
+                let n = serde_json::Number::from_f64(f)
+                    .ok_or_else(|| anyhow::anyhow!(
+                        "invalid --filter '{s}': value '{raw}' cannot be represented as a number (NaN or infinity)"
+                    ))?;
+                Some(Value::Number(n))
+            } else {
+                Some(Value::String(raw.to_string()))
+            }
+        } else if needs_value {
+            bail!(
+                "invalid --filter '{s}': operator '{}' requires a value (FIELD:OP:VALUE)",
+                parts[1]
+            );
+        } else {
+            None
+        };
+
+        Ok(FilterCondition { field, op, value })
+    }
+}
+
 /// Supported filter operators.
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -66,6 +111,43 @@ pub enum FilterOp {
     EndsWith,
     IsNull,
     IsNotNull,
+}
+
+impl FilterOp {
+    /// Parse an operator from its snake_case name (same names as YAML).
+    pub fn parse(s: &str) -> Result<Self> {
+        match s {
+            "eq" => Ok(FilterOp::Eq),
+            "ne" => Ok(FilterOp::Ne),
+            "gt" => Ok(FilterOp::Gt),
+            "lt" => Ok(FilterOp::Lt),
+            "gte" => Ok(FilterOp::Gte),
+            "lte" => Ok(FilterOp::Lte),
+            "contains" => Ok(FilterOp::Contains),
+            "starts_with" => Ok(FilterOp::StartsWith),
+            "ends_with" => Ok(FilterOp::EndsWith),
+            "is_null" => Ok(FilterOp::IsNull),
+            "is_not_null" => Ok(FilterOp::IsNotNull),
+            _ => bail!("unknown filter operator '{s}' (valid: eq ne gt lt gte lte contains starts_with ends_with is_null is_not_null)"),
+        }
+    }
+
+    /// Return the canonical snake_case name for display.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            FilterOp::Eq => "eq",
+            FilterOp::Ne => "ne",
+            FilterOp::Gt => "gt",
+            FilterOp::Lt => "lt",
+            FilterOp::Gte => "gte",
+            FilterOp::Lte => "lte",
+            FilterOp::Contains => "contains",
+            FilterOp::StartsWith => "starts_with",
+            FilterOp::EndsWith => "ends_with",
+            FilterOp::IsNull => "is_null",
+            FilterOp::IsNotNull => "is_not_null",
+        }
+    }
 }
 
 /// One entry in the `templates` list – either a file path or an inline string.

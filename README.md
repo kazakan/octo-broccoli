@@ -29,6 +29,10 @@ Arguments:
 Options:
   --db <PATH>            Override source.db_path from the config
   --template <FILE>      Template file(s) – can be repeated; overrides config templates
+  --filter FIELD:OP[:VALUE]
+                         Add or override a filter condition (can be repeated).
+                         If the field already has a filter in the config the CLI
+                         value replaces it and a warning is printed to stderr.
   -h, --help             Print help
 ```
 
@@ -48,6 +52,18 @@ ocbro run config.yaml --template report.tpl
 ocbro run config.yaml \
   --template summary.tpl \
   --template detail.tpl
+
+# Add a filter from the CLI (combined AND with config filters)
+ocbro run config.yaml --filter age:gte:18
+
+# Multiple CLI filters
+ocbro run config.yaml --filter active:eq:1 --filter age:gte:18
+
+# Filter that needs no value
+ocbro run config.yaml --filter deleted_at:is_null
+
+# Override a config filter (prints a warning to stderr)
+ocbro run config.yaml --filter age:lt:30
 ```
 
 ---
@@ -116,16 +132,30 @@ Templates receive a single JSON object:
 ```json
 {
   "rows":  [ { "id": 1, "name": "Alice", ... }, ... ],
-  "count": 3
+  "count": 3,
+  "row":   { "id": 1, "name": "Alice", ... }
 }
 ```
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `rows`   | array  | All result rows after filter + projection |
+| `count`  | number | Number of rows (`rows.length`) |
+| `row`    | object \| null | First row, or `null` when there are no results. Lets single-row templates skip `{{#each rows}}` |
 
 Use [Handlebars](https://handlebarsjs.com/) syntax:
 
 ```handlebars
+{{! multi-row: iterate with #each }}
 Total: {{count}}
 {{#each rows}}- {{name}} ({{age}})
 {{/each}}
+```
+
+```handlebars
+{{! single-row: use {{row.field}} directly }}
+Name: {{row.name}}
+Age:  {{row.age}}
 ```
 
 ---
