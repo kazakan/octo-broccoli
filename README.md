@@ -1,11 +1,6 @@
-# ocbro – Simple template filling CLI
+# ocbro
 
-A simple, **read-only** CLI tool that:
-
-1. Reads rows from a **SQLite** database
-2. Applies **in-memory filters** (AND conditions)
-3. Applies a **projection** (select only certain fields)
-4. Renders one or more **Handlebars templates**
+Simple template filling CLI
 
 ---
 
